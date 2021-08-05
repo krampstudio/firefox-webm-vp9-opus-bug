@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Video player tester</title>
+    <style>
+        .header, .content {
+            display: flex;
+            flex-direction: row;
+        }
+        .counter {
+            text-align: right;
+            font-family: monospace;
+            font-size: 2em;
+            width: 4em;
+            white-space: pre;
+            padding: 0 5px;
+            flex: 0 0 auto;
+            color: #aaa;
+        }
+        .active {
+            color: #000;
+        }
+        .input .source {
+            padding: 2px;
+        }
+        .input .actions {
+            padding: 2px;
+        }
+        .input input {
+            margin: 0 2px;
+        }
+        .output {
+            font-family: monospace;
+            white-space: pre;
+            padding: 0 5px;
+            flex: 0 0 auto;
+        }
+        .output .timestamp {
+            color: #aaa;
+            font-width: bold;
+            display: inline-block;
+            width: 10em;
+        }
+        .output .message {
+            color: #888;
+            font-style: italic;
+            display: inline-block;
+        }
+    </style>
+</head>
+<body>
+<head>
+    <h1>Issue reloading WebM videos in Firefox</h1>
+    <p>Instructions:
+        <ul>
+            <li>click the button with a given video multiple times, no need to play the videos</li>
+            <li> some webm videos after some trials, will take a huge amount of time between `suspend` and `canplay` (sometimes more than 30s)</li>
+        </ul>
+    </p>
+</head>
+<div class="header">
+    <div class="counter"></div>
+    <div class="input">
+        <div class="source">
+            <input type="text" size="80" name="source" value="" placeholder="Video source" />
+            <input type="button" name="load" value="load"/>
+        </div>
+        <div class="actions"></div>
+    </div>
+</div>
+<div class="content">
+    <div class="player"></div>
+    <div class="output"></div>
+</div>
+<script>
+    (function () {
+        const player = document.querySelector('.player');
+        const actions = document.querySelector('.actions');
+        const output = document.querySelector('.output');
+        const source = document.querySelector('.input [name="source"]');
+        const load = document.querySelector('.input [name="load"]');
+        const counter = document.querySelector('.counter');
+        let interval = null;
+
+        const mediaEvents = [
+            'abort',
+            'canplay',
+            'canplaythrough',
+            'durationchange',
+            'emptied',
+            'ended',
+            'error',
+            'loadeddata',
+            'loadedmetadata',
+            'loadstart',
+            'pause',
+            'play',
+            'playing',
+            'progress',
+            'ratechange',
+            'seeked',
+            'seeking',
+            'stalled',
+            'suspend',
+            'timeupdate',
+            'volumechange',
+            'waiting',
+            'readystatechange'
+        ];
+
+        const files = [{
+            label: 'Schlossbergbahn (WebM - vp8 / vorbis)',
+            src: './Schlossbergbahn.webm'
+        }, {
+            label: 'Big Buck Bunny (WebM - vp8 / vorbis )',
+            src: 'big-buck-bunny_VP8.webm'
+        }, {
+            label: 'Big Buck Bunny (WebM - vp9)',
+            src: 'big-buck-bunny_VP9.webm'
+        }];
+
+        function logLine(message) {
+            const timestamp = `[${Date.now() / 1000}]`
+            window.console.log(timestamp, message);
+
+            const line = document.createElement('div');
+            line.innerHTML = `<span class="timestamp">${timestamp}</span> <span class="message">${message}</span>`;
+            output.appendChild(line);
+        }
+
+        function updateCounter(count) {
+            counter.innerHTML = `${count}s`;
+        }
+
+        function disableInput(timeout){
+            const inputs = Array.from(document.querySelectorAll('input'));
+            inputs.forEach(input => input.setAttribute('disabled', 'disabled'));
+            setTimeout(() => inputs.forEach(input => input.removeAttribute('disabled')), timeout);
+        }
+
+        function loadPlayer(url) {
+            disableInput(500);
+
+            player.innerHTML = `<video controls src="${url}?ts=${Date.now()}" width="500px"></video>`;
+
+            const video = player.querySelector('video');
+            let count = 0;
+
+            if (interval) {
+                clearInterval(interval);
+            }
+            interval = setInterval(() => updateCounter(++count), 1000);
+            updateCounter(count)
+            counter.classList.add('active');
+            video.addEventListener('canplay', () => {
+                counter.classList.remove('active');
+                clearInterval(interval);
+                interval = null;
+            });
+
+            console.log('=========================================================')
+            console.log('VIDEO:', url)
+            console.log('=========================================================')
+
+            output.innerHTML = '';
+            logLine(`VIDEO: ${url}`);
+
+            mediaEvents.forEach(ev => {
+                video.addEventListener(ev, e => logLine(`event: ${e.type} networkState: ${video.networkState} readyState: ${video.readyState}`));
+            });
+
+            return video;
+        }
+
+        files.forEach(file => {
+            const btn = document.createElement('input');
+            btn.setAttribute('type', 'button');
+            btn.setAttribute('value', file.label);
+            actions.appendChild(btn);
+
+            btn.addEventListener('click', () => loadPlayer(file.src));
+        });
+
+        load.addEventListener('click', () => {
+            const url = source.value;
+            if (!url) {
+                return alert('You must supply a video URL!')
+            }
+            loadPlayer(url);
+        });
+    })();
+</script>
+</body>
+</html>
